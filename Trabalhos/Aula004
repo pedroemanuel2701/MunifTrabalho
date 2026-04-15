@@ -1,0 +1,102 @@
+import pandas as pd
+
+data = [
+    ['infantil','miopia','não','reduzida','nenhuma'],
+    ['infantil','miopia','sim','normal','gelatinosa'],
+    ['infantil','hipermetropia','não','normal','gelatinosa'],
+    ['infantil','hipermetropia','sim','normal','dura'],
+    ['adolescente','miopia','não','reduzida','gelatinosa'],
+    ['adolescente','miopia','sim','reduzida','nenhuma'],
+    ['adolescente','miopia','não','normal','dura'],
+    ['adolescente','hipermetropia','não','reduzida','gelatinosa'],
+    ['adolescente','hipermetropia','sim','normal','dura'],
+    ['adulto','miopia','não','normal','gelatinosa'],
+    ['adulto','miopia','sim','normal','dura'],
+    ['adulto','miopia','sim','normal','gelatinosa'],
+    ['adulto','hipermetropia','não','reduzida','nenhuma'],
+    ['adulto','hipermetropia','sim','normal','gelatinosa'],
+    ['adulto','hipermetropia','não','normal','gelatinosa']
+]
+
+colunas = ['Idade', 'Diagnostico', 'Astigmatismo', 'Taxa_Lacrimal', 'Classe']
+df = pd.DataFrame(data, columns=colunas)
+
+
+def prob_laplace(df, cond_cols, cond_vals, target_col, target_val, alpha=1):
+    subset = df
+    for col, val in zip(cond_cols, cond_vals):
+        subset = subset[subset[col] == val]
+    
+    count_cond = len(subset)
+    count_target = len(subset[subset[target_col] == target_val])
+    v_target = df[target_col].nunique() 
+    
+    return (count_target + alpha) / (count_cond + alpha * v_target)
+
+print("="*60)
+print("EXERCÍCIO 1: Tabelas de Contagens e Probabilidades (Naive Bayes)")
+print("="*60)
+
+tabela_idade = pd.crosstab(df['Idade'], df['Classe'])
+print("Contagem Simples (Idade x Classe):")
+print(tabela_idade)
+print("\nA probabilidade suavizada seria calculada aplicando Laplace sobre essas contagens.")
+
+paciente = {
+    'Idade': 'infantil',
+    'Diagnostico': 'hipermetropia',
+    'Astigmatismo': 'não',
+    'Taxa_Lacrimal': 'reduzida'
+}
+
+print("\n" + "="*60)
+print("EXERCÍCIO 2: Previsão Naive Bayes (Paciente Novo)")
+print("="*60)
+
+classes = df['Classe'].unique()
+probs_nb = {}
+
+for c in classes:
+    p_c = (len(df[df['Classe']==c]) + 1) / (len(df) + 1 * len(classes))
+    
+    p_idade = prob_laplace(df, ['Classe'], [c], 'Idade', paciente['Idade'])
+    p_diag  = prob_laplace(df, ['Classe'], [c], 'Diagnostico', paciente['Diagnostico'])
+    p_astig = prob_laplace(df, ['Classe'], [c], 'Astigmatismo', paciente['Astigmatismo'])
+    p_taxa  = prob_laplace(df, ['Classe'], [c], 'Taxa_Lacrimal', paciente['Taxa_Lacrimal'])
+    
+    probs_nb[c] = p_c * p_idade * p_diag * p_astig * p_taxa
+
+soma_nb = sum(probs_nb.values())
+print("Probabilidades Normalizadas (Naive Bayes):")
+for c in classes:
+    prob_norm = (probs_nb[c] / soma_nb) * 100
+    print(f"Classe '{c}': {prob_norm:.2f}%")
+    
+classe_vencedora_nb = max(probs_nb, key=probs_nb.get)
+print(f"\n>> PREVISÃO NAIVE BAYES: O paciente usará lente '{classe_vencedora_nb}'")
+
+
+print("\n" + "="*60)
+print("EXERCÍCIOS 3 e 4: Rede Bayesiana (Dependência Idade -> Taxa Lacrimal)")
+print("="*60)
+
+probs_bn = {}
+
+for c in classes:
+    p_c = (len(df[df['Classe']==c]) + 1) / (len(df) + 1 * len(classes))
+    p_idade = prob_laplace(df, ['Classe'], [c], 'Idade', paciente['Idade'])
+    p_diag  = prob_laplace(df, ['Classe'], [c], 'Diagnostico', paciente['Diagnostico'])
+    p_astig = prob_laplace(df, ['Classe'], [c], 'Astigmatismo', paciente['Astigmatismo'])
+    
+    p_taxa_dependente = prob_laplace(df, ['Classe', 'Idade'], [c, paciente['Idade']], 'Taxa_Lacrimal', paciente['Taxa_Lacrimal'])
+    
+    probs_bn[c] = p_c * p_idade * p_diag * p_astig * p_taxa_dependente
+
+soma_bn = sum(probs_bn.values())
+print("Probabilidades Normalizadas (Rede Bayesiana):")
+for c in classes:
+    prob_norm = (probs_bn[c] / soma_bn) * 100
+    print(f"Classe '{c}': {prob_norm:.2f}%")
+
+classe_vencedora_bn = max(probs_bn, key=probs_bn.get)
+print(f"\n>> PREVISÃO REDE BAYESIANA: O paciente usará lente '{classe_vencedora_bn}'")
