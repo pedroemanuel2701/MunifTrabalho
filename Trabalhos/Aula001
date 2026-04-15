@@ -1,0 +1,56 @@
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.metrics import accuracy_score, classification_report
+
+SHEET_ID = "1pOT7YtKqAP1d6VmCP7vwJsAzSEliSPvaz9YxZWvvmIA"
+GID = "0"
+url_tsv = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=tsv&gid={GID}"
+
+df = pd.read_csv(url_tsv, sep="\t", decimal=",")
+
+if len(df.columns) == 1:
+    print("Aviso: Re-processando colunas...")
+    col_name = df.columns[0]
+    df = df[col_name].str.split(',', expand=True)
+
+print("Colunas lidas:", list(df.columns))
+
+df = df.dropna() 
+coluna_alvo = df.columns[-1]
+X = df.drop(coluna_alvo, axis=1)
+y = df[coluna_alvo]
+
+for col in X.columns:
+    X[col] = pd.to_numeric(X[col], errors='coerce')
+X = X.fillna(0)
+
+le = LabelEncoder()
+y = le.fit_transform(y.astype(str))
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+
+print("\n--- Resultados KNN ---")
+vizinhos = [3, 5]
+for k in vizinhos:
+    pipeline_knn = Pipeline([
+        ('scaler', StandardScaler()),
+        ('knn', KNeighborsClassifier(n_neighbors=k))
+    ])
+    pipeline_knn.fit(X_train, y_train)
+    y_pred_knn = pipeline_knn.predict(X_test)
+    acuracia = accuracy_score(y_test, y_pred_knn)
+    print(f"KNN (k={k}) -> Acurácia: {acuracia:.2%}")
+
+print("\n--- Resultados Árvore de Decisão ---")
+profundidades = [3, None]
+for prof in profundidades:
+    dtree = DecisionTreeClassifier(max_depth=prof, random_state=42)
+    dtree.fit(X_train, y_train)
+    y_pred_tree = dtree.predict(X_test)
+    acuracia_tree = accuracy_score(y_test, y_pred_tree)
+    print(f"Árvore (Profundidade={prof}) -> Acurácia: {acuracia_tree:.2%}")
